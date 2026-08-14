@@ -142,7 +142,7 @@ fi
 if gh release view "${TAG}" >/dev/null 2>&1; then
   echo "ℹ️  Release ${TAG} 已存在，跳过（如需覆盖请先执行：gh release delete ${TAG}）"
 else
-  gh release create "${TAG}" --title "v${VERSION}" --notes "Weixin Sync ${VERSION}" \
+  gh release create "${TAG}" --title "${VERSION}" --notes "Weixin Sync ${VERSION}" \
     manifest.json main.js styles.css versions.json \
     && echo "✅ 已创建 Release ${TAG}（含 4 个发布附件）"
 fi
