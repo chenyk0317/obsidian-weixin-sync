@@ -1,6 +1,6 @@
 {
   "name": "weixin-sync-plugin",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "微信文章同步插件",
   "main": "weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js",
   "scripts": {

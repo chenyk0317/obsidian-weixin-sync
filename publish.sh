@@ -12,7 +12,7 @@
 # 兼容首次发布（自动处理与远程历史分叉）与后续迭代（跳过已存在的 Release）。
 # 远程仓库固定为 chenyk0317/obsidian-weixin-sync（GitHub 上的仓库名，与本地目录名不同是正常的）。
 #
-# 前置：本机已安装 Git、Node.js(npm)、python3。GitHub Release 附件需在网页端手动上传（或用 gh 手动创建）。
+# 前置：本机已安装 Git、Node.js(npm)、python3、gh（已登录）。脚本会用 gh 自动创建带附件的 GitHub Release。
 set -uo pipefail
 
 # ---------- 路径 ----------
@@ -32,6 +32,11 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "❌ 未检测到 python3（用于更新 versions.json），请先安装"
   exit 1
 fi
+if ! command -v gh >/dev/null 2>&1; then
+  echo "❌ 未检测到 gh（用于自动创建带附件的 GitHub Release），请先执行：brew install gh && gh auth login"
+  exit 1
+fi
+gh auth status >/dev/null 2>&1 || { echo "❌ 请先登录 GitHub：gh auth login"; exit 1; }
 
 read_version() { grep -oE '"version"[[:space:]]*:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' "$1" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'; }
 
@@ -121,10 +126,9 @@ push_branch() {
 }
 push_branch "$CUR_BRANCH"
 
-# ---------- 7. 打 Tag（已存在则跳过）----------
-# 注：纯 git 无法创建 GitHub Release 及其下载附件，故此处仅打并推送 git tag 作为版本标记；
-#     带 manifest.json / main.js / styles.css / versions.json 附件的 GitHub Release 需在网页端手动创建（见下方指引）。
+# ---------- 7. 打 Tag + 创建带附件的 Release（已存在则跳过）----------
 TAG="v${VERSION}"
+# 先确保 git tag 存在（纯 git 兜底；若 gh 失败也可仅凭 tag 重建 Release）
 if git rev-parse "${TAG}" >/dev/null 2>&1; then
   echo "ℹ️  Tag ${TAG} 已存在，跳过（如需覆盖请先删除本地与远程 tag 后重跑）"
 else
@@ -132,18 +136,23 @@ else
   git push origin --tags
   echo "✅ 已创建并推送 Tag ${TAG}"
 fi
+# 用 gh 创建带附件的 GitHub Release（Obsidian 社区目录正是从这些附件读取插件文件）
+if gh release view "${TAG}" >/dev/null 2>&1; then
+  echo "ℹ️  Release ${TAG} 已存在，跳过（如需覆盖请先执行：gh release delete ${TAG}）"
+else
+  gh release create "${TAG}" --title "v${VERSION}" --notes "Weixin Sync v${VERSION}" \
+    manifest.json main.js styles.css versions.json \
+    && echo "✅ 已创建 Release ${TAG}（含 4 个发布附件）"
+fi
 
 # ---------- 8. 社区后台提交指引 ----------
 SUBMIT_URL="https://community.obsidian.md"
 echo ""
-echo "🚀 GitHub 仓库与 Tag 已就绪。请到 GitHub 网页为 ${TAG} 创建 Release，并上传以下四个文件作为附件："
-echo "   • manifest.json   • main.js   • styles.css   • versions.json"
-echo "   （Obsidian 社区目录正是从这些 Release 附件读取插件文件，未上传则插件无法安装）"
+echo "🚀 GitHub 仓库、Tag 与 Release ${TAG} 已就绪（含 4 个附件：manifest.json / main.js / styles.css / versions.json）。"
+echo "   （Obsidian 社区目录正是从这些 Release 附件读取插件文件）"
 echo ""
-echo "   方式一（网页）：打开 https://github.com/${REPO}/releases/new?tag=${TAG} ，"
-echo "   标题填 v${VERSION}，把上面四个文件拖入附件区，点 Publish release。"
-echo "   方式二（若本机装有 gh，手动执行）："
-echo "   gh release create ${TAG} --title \"v${VERSION}\" --notes \"Weixin Sync v${VERSION}\" manifest.json main.js styles.css versions.json"
+echo "   如需在网页端核对或重建 Release：打开 https://github.com/${REPO}/releases/new?tag=${TAG} ，"
+echo "   标题填 v${VERSION}，把上面四个文件作为附件上传，点 Publish release。"
 echo ""
 echo "   随后到 Obsidian 社区目录提交/更新插件："
 echo "   1) 打开 ${SUBMIT_URL} 并用你的 Obsidian 账号登录"
