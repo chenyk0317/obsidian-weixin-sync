@@ -1,0 +1,7 @@
+node_modules/
+# 本地测试 vault（Obsidian 插件目录，含用户 data.json，不应入库）
+weixin-sync-test-vault/
+# 构建产物按需入库（manifest.json / main.js / versions.json 需随发版提交），此处仅忽略 sourcemap
+*.map
+.DS_Store
+.hotreload

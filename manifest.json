@@ -1,0 +1,9 @@
+{
+  "id": "weixin-sync",
+  "name": "Weixin Sync",
+  "version": "1.0.1",
+  "minAppVersion": "1.0.0",
+  "description": "微信文章一键暂存，自动同步至本地知识库",
+  "author": "chenyk0317",
+  "isDesktopOnly": false
+}
