@@ -1,0 +1,69 @@
+/* ============================================================
+ * Weixin Sync 插件样式
+ * 设置页用到的自定义类集中在此，避免内联 style 触发官方 lint。
+ * ============================================================ */
+
+/* 小程序引导卡片（设置页「已绑定 Key」下方） */
+.wx-mini-guide {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.wx-mini-guide-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.wx-mini-guide-title {
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.wx-mini-guide-desc {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.wx-mini-code {
+  flex: 0 0 auto;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+/* API Key 状态标签（彩色 pill，放在「移除绑定」按钮前） */
+.wx-key-status {
+  display: inline-block;
+  padding: 1px 8px;
+  margin-right: 8px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.wx-status-valid {
+  color: #1e7e34;
+}
+
+.wx-status-invalid,
+.wx-status-revoked {
+  color: #b0312f;
+}
+
+.wx-status-expired,
+.wx-status-unbound {
+  color: #b26a00;
+}
+
+.wx-status-unknown {
+  color: #6b7280;
+}

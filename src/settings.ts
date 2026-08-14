@@ -45,7 +45,7 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
   private async render(): Promise<void> {
     const { containerEl } = this;
 
-    containerEl.createEl("h2", { text: "设备绑定（API Key）" });
+    new Setting(containerEl).setName("设备绑定（API Key）").setHeading();
     new Setting(containerEl)
       .setName("设备名称")
       .setDesc("显示在绑定关系中的名称（默认「仓库名 的 obsidian」）")
@@ -113,7 +113,7 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
     const keys = this.plugin.settings.apiKeys;
     if (keys.length) {
       const bound = keys.length;
-      containerEl.createEl("h3", { text: `已绑定 Key（${bound}）` });
+      new Setting(containerEl).setName(`已绑定 Key（${bound}）`).setHeading();
 
       // 一次性批量拉取所有 Key 的状态（失败则用回退值）
       const statusMap = new Map<string, ApiKeyInfo>();
@@ -153,10 +153,10 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
         return;
       }
 
-      const tagMeta = (info?: ApiKeyInfo): { label: string; color: string } => {
-        if (!info) return { label: "状态未知", color: "#6b7280" };
-        if ((info.status as string) === "invalid") return { label: "无效", color: "#b0312f" };
-        if (info.status === "revoked") return { label: "已吊销", color: "#b0312f" };
+      const tagMeta = (info?: ApiKeyInfo): { label: string; cls: string } => {
+        if (!info) return { label: "状态未知", cls: "wx-status-unknown" };
+        if ((info.status as string) === "invalid") return { label: "无效", cls: "wx-status-invalid" };
+        if (info.status === "revoked") return { label: "已吊销", cls: "wx-status-revoked" };
         // 仅当 expires_at 是合理日期（年份 > 2000，排除零值 0001-01-01）且小于当前时间才视为已过期
         const exp = info.expires_at ? new Date(info.expires_at) : null;
         if (
@@ -165,9 +165,9 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
           exp.getFullYear() > 2000 &&
           exp.getTime() < Date.now()
         )
-          return { label: "已过期", color: "#b26a00" };
-        if (info.device_id) return { label: "有效", color: "#1e7e34" };
-        return { label: "未绑定", color: "#b26a00" };
+          return { label: "已过期", cls: "wx-status-expired" };
+        if (info.device_id) return { label: "有效", cls: "wx-status-valid" };
+        return { label: "未绑定", cls: "wx-status-unbound" };
       };
 
       for (let idx = 0; idx < keys.length; idx++) {
@@ -177,11 +177,8 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
         const meta = tagMeta(info);
         const keySetting = new Setting(containerEl)
           .setName(`${name}(${this.maskKey(k)})`);
-        // 状态标签（彩色 pill，放在移除绑定按钮前）
-        const tag = keySetting.controlEl.createSpan({ text: meta.label, cls: "wx-key-status" });
-        tag.style.cssText =
-          `color:${meta.color};border:1px solid ${meta.color};` +
-          "display:inline-block;padding:1px 8px;margin-right:8px;border-radius:10px;font-size:12px;line-height:1.6;";
+        // 状态标签（彩色 pill，放在移除绑定按钮前；颜色由 styles.css 按状态类控制）
+        const tag = keySetting.controlEl.createSpan({ text: meta.label, cls: `wx-key-status ${meta.cls}` });
         keySetting.addButton((btn) =>
           btn
             .setButtonText("移除绑定")
@@ -215,7 +212,7 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
     // 打开小程序引导（位于「已绑定 Key」下方）
     this.renderMiniGuide(containerEl);
 
-    containerEl.createEl("h2", { text: "同步设置" });
+    new Setting(containerEl).setName("同步设置").setHeading();
     new Setting(containerEl)
       .setName("自动同步间隔（分钟）")
       .setDesc("0 表示仅手动同步；默认 5 分钟")
@@ -295,32 +292,27 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
   }
 
   private renderMiniGuide(containerEl: HTMLElement): void {
-    // 引导卡片：左侧文案 + 右侧小程序码的横向布局，压低区域高度
+    // 引导卡片：左侧文案 + 右侧小程序码的横向布局，压低区域高度。
+    // 所有样式统一放在仓库根目录 styles.css 的 .wx-mini-* 类中，避免内联 style 触发官方 lint。
     const guide = containerEl.createDiv({ cls: "wx-mini-guide" });
-    guide.style.cssText =
-      "display:flex;align-items:center;gap:16px;margin:12px 0 16px;padding:12px 14px;" +
-      "border:1px solid var(--background-modifier-border);border-radius:8px;" +
-      "background:var(--background-secondary);";
 
     const textWrap = guide.createDiv({ cls: "wx-mini-guide-text" });
-    textWrap.style.cssText = "flex:1;min-width:0;";
 
-    const title = textWrap.createEl("div", { text: "如何获取 API Key？" });
-    title.style.cssText = "font-weight:500;margin-bottom:6px;";
+    const title = textWrap.createEl("div", {
+      text: "如何获取 API Key？",
+      cls: "wx-mini-guide-title",
+    });
 
     const desc = textWrap.createEl("p", {
+      cls: "wx-mini-guide-desc",
       text:
         "打开微信 → 搜索小程序「Obsidian同步」，或直接用微信扫描右侧小程序码；进入后在「我的」-「API Key 管理」中生成并复制，再回到此处粘贴绑定。",
     });
-    desc.style.cssText = "margin:0;line-height:1.6;";
 
     const img = guide.createEl("img", {
       attr: { alt: "Obsidian同步 小程序码", src: weappcodeUrl },
       cls: "wx-mini-code",
     });
-    img.style.cssText =
-      "flex:0 0 auto;width:120px;height:120px;object-fit:contain;border-radius:8px;" +
-      "border:1px solid var(--background-modifier-border);";
   }
 
   private maskKey(key: string): string {

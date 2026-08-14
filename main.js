@@ -177,7 +177,7 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
   }
   async render() {
     const { containerEl } = this;
-    containerEl.createEl("h2", { text: "\u8BBE\u5907\u7ED1\u5B9A\uFF08API Key\uFF09" });
+    new import_obsidian2.Setting(containerEl).setName("\u8BBE\u5907\u7ED1\u5B9A\uFF08API Key\uFF09").setHeading();
     new import_obsidian2.Setting(containerEl).setName("\u8BBE\u5907\u540D\u79F0").setDesc("\u663E\u793A\u5728\u7ED1\u5B9A\u5173\u7CFB\u4E2D\u7684\u540D\u79F0\uFF08\u9ED8\u8BA4\u300C\u4ED3\u5E93\u540D \u7684 obsidian\u300D\uFF09").addText(
       (t) => t.setValue(this.plugin.effectiveDeviceName()).onChange(async (v) => {
         this.plugin.settings.deviceName = v;
@@ -230,7 +230,7 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
     const keys = this.plugin.settings.apiKeys;
     if (keys.length) {
       const bound = keys.length;
-      containerEl.createEl("h3", { text: `\u5DF2\u7ED1\u5B9A Key\uFF08${bound}\uFF09` });
+      new import_obsidian2.Setting(containerEl).setName(`\u5DF2\u7ED1\u5B9A Key\uFF08${bound}\uFF09`).setHeading();
       const statusMap = /* @__PURE__ */ new Map();
       try {
         const res = await this.plugin.api.getKeyStatuses(keys);
@@ -266,17 +266,17 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
       }
       const tagMeta = (info) => {
         if (!info)
-          return { label: "\u72B6\u6001\u672A\u77E5", color: "#6b7280" };
+          return { label: "\u72B6\u6001\u672A\u77E5", cls: "wx-status-unknown" };
         if (info.status === "invalid")
-          return { label: "\u65E0\u6548", color: "#b0312f" };
+          return { label: "\u65E0\u6548", cls: "wx-status-invalid" };
         if (info.status === "revoked")
-          return { label: "\u5DF2\u540A\u9500", color: "#b0312f" };
+          return { label: "\u5DF2\u540A\u9500", cls: "wx-status-revoked" };
         const exp = info.expires_at ? new Date(info.expires_at) : null;
         if (exp && !isNaN(exp.getTime()) && exp.getFullYear() > 2e3 && exp.getTime() < Date.now())
-          return { label: "\u5DF2\u8FC7\u671F", color: "#b26a00" };
+          return { label: "\u5DF2\u8FC7\u671F", cls: "wx-status-expired" };
         if (info.device_id)
-          return { label: "\u6709\u6548", color: "#1e7e34" };
-        return { label: "\u672A\u7ED1\u5B9A", color: "#b26a00" };
+          return { label: "\u6709\u6548", cls: "wx-status-valid" };
+        return { label: "\u672A\u7ED1\u5B9A", cls: "wx-status-unbound" };
       };
       for (let idx = 0; idx < keys.length; idx++) {
         const k = keys[idx];
@@ -284,8 +284,7 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
         const name = (info == null ? void 0 : info.name) || `Key #${idx + 1}`;
         const meta = tagMeta(info);
         const keySetting = new import_obsidian2.Setting(containerEl).setName(`${name}(${this.maskKey(k)})`);
-        const tag = keySetting.controlEl.createSpan({ text: meta.label, cls: "wx-key-status" });
-        tag.style.cssText = `color:${meta.color};border:1px solid ${meta.color};display:inline-block;padding:1px 8px;margin-right:8px;border-radius:10px;font-size:12px;line-height:1.6;`;
+        const tag = keySetting.controlEl.createSpan({ text: meta.label, cls: `wx-key-status ${meta.cls}` });
         keySetting.addButton(
           (btn) => btn.setButtonText("\u79FB\u9664\u7ED1\u5B9A").setWarning().onClick(async () => {
             try {
@@ -311,7 +310,7 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
       });
     }
     this.renderMiniGuide(containerEl);
-    containerEl.createEl("h2", { text: "\u540C\u6B65\u8BBE\u7F6E" });
+    new import_obsidian2.Setting(containerEl).setName("\u540C\u6B65\u8BBE\u7F6E").setHeading();
     new import_obsidian2.Setting(containerEl).setName("\u81EA\u52A8\u540C\u6B65\u95F4\u9694\uFF08\u5206\u949F\uFF09").setDesc("0 \u8868\u793A\u4EC5\u624B\u52A8\u540C\u6B65\uFF1B\u9ED8\u8BA4 5 \u5206\u949F").addText(
       (t) => t.setValue(String(this.plugin.settings.syncInterval)).onChange(async (v) => {
         this.plugin.settings.syncInterval = parseInt(v) || 0;
@@ -371,20 +370,19 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
   }
   renderMiniGuide(containerEl) {
     const guide = containerEl.createDiv({ cls: "wx-mini-guide" });
-    guide.style.cssText = "display:flex;align-items:center;gap:16px;margin:12px 0 16px;padding:12px 14px;border:1px solid var(--background-modifier-border);border-radius:8px;background:var(--background-secondary);";
     const textWrap = guide.createDiv({ cls: "wx-mini-guide-text" });
-    textWrap.style.cssText = "flex:1;min-width:0;";
-    const title = textWrap.createEl("div", { text: "\u5982\u4F55\u83B7\u53D6 API Key\uFF1F" });
-    title.style.cssText = "font-weight:500;margin-bottom:6px;";
+    const title = textWrap.createEl("div", {
+      text: "\u5982\u4F55\u83B7\u53D6 API Key\uFF1F",
+      cls: "wx-mini-guide-title"
+    });
     const desc = textWrap.createEl("p", {
+      cls: "wx-mini-guide-desc",
       text: "\u6253\u5F00\u5FAE\u4FE1 \u2192 \u641C\u7D22\u5C0F\u7A0B\u5E8F\u300CObsidian\u540C\u6B65\u300D\uFF0C\u6216\u76F4\u63A5\u7528\u5FAE\u4FE1\u626B\u63CF\u53F3\u4FA7\u5C0F\u7A0B\u5E8F\u7801\uFF1B\u8FDB\u5165\u540E\u5728\u300C\u6211\u7684\u300D-\u300CAPI Key \u7BA1\u7406\u300D\u4E2D\u751F\u6210\u5E76\u590D\u5236\uFF0C\u518D\u56DE\u5230\u6B64\u5904\u7C98\u8D34\u7ED1\u5B9A\u3002"
     });
-    desc.style.cssText = "margin:0;line-height:1.6;";
     const img = guide.createEl("img", {
       attr: { alt: "Obsidian\u540C\u6B65 \u5C0F\u7A0B\u5E8F\u7801", src: weappcode_default },
       cls: "wx-mini-code"
     });
-    img.style.cssText = "flex:0 0 auto;width:120px;height:120px;object-fit:contain;border-radius:8px;border:1px solid var(--background-modifier-border);";
   }
   maskKey(key) {
     if (key.length <= 12)

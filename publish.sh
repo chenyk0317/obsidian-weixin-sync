@@ -12,7 +12,7 @@
 # 兼容首次发布（自动处理与远程历史分叉）与后续迭代（跳过已存在的 Release）。
 # 远程仓库固定为 chenyk0317/obsidian-weixin-sync（GitHub 上的仓库名，与本地目录名不同是正常的）。
 #
-# 前置：本机已安装 gh 且 gh auth login 完成；已安装 Node.js(npm)、python3。
+# 前置：本机已安装 Git、Node.js(npm)、python3。GitHub Release 附件需在网页端手动上传（或用 gh 手动创建）。
 set -uo pipefail
 
 # ---------- 路径 ----------
@@ -20,11 +20,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"   # = weixin-sync-plugin
 REPO="chenyk0317/obsidian-weixin-sync"
 
 # ---------- 0. 前置检查 ----------
-if ! command -v gh >/dev/null 2>&1; then
-  echo "❌ 未检测到 gh，请先执行：brew install gh && gh auth login"
+if ! command -v git >/dev/null 2>&1; then
+  echo "❌ 未检测到 git，请先安装 Git"
   exit 1
 fi
-gh auth status >/dev/null 2>&1 || { echo "❌ 请先登录 GitHub：gh auth login"; exit 1; }
 if ! command -v npm >/dev/null 2>&1; then
   echo "❌ 未检测到 npm，请先安装 Node.js"
   exit 1
@@ -122,18 +121,31 @@ push_branch() {
 }
 push_branch "$CUR_BRANCH"
 
-# ---------- 7. 打 Release（已存在则跳过）----------
-if gh release view "${VERSION}" >/dev/null 2>&1; then
-  echo "ℹ️  Release ${VERSION} 已存在，跳过（如需覆盖请先执行：gh release delete ${VERSION}）"
+# ---------- 7. 打 Tag（已存在则跳过）----------
+# 注：纯 git 无法创建 GitHub Release 及其下载附件，故此处仅打并推送 git tag 作为版本标记；
+#     带 manifest.json / main.js / styles.css / versions.json 附件的 GitHub Release 需在网页端手动创建（见下方指引）。
+TAG="v${VERSION}"
+if git rev-parse "${TAG}" >/dev/null 2>&1; then
+  echo "ℹ️  Tag ${TAG} 已存在，跳过（如需覆盖请先删除本地与远程 tag 后重跑）"
 else
-  gh release create "${VERSION}" --title "v${VERSION}" --notes "Weixin Sync v${VERSION}：微信文章暂存后自动同步至本地知识库。" manifest.json main.js versions.json \
-    && echo "✅ 已创建 Release ${VERSION}"
+  git tag -a "${TAG}" -m "Release v${VERSION}: Weixin Sync"
+  git push origin --tags
+  echo "✅ 已创建并推送 Tag ${TAG}"
 fi
 
 # ---------- 8. 社区后台提交指引 ----------
 SUBMIT_URL="https://community.obsidian.md"
 echo ""
-echo "🚀 GitHub 仓库与 Release 已就绪。现在请到 Obsidian 社区目录提交/更新插件："
+echo "🚀 GitHub 仓库与 Tag 已就绪。请到 GitHub 网页为 ${TAG} 创建 Release，并上传以下四个文件作为附件："
+echo "   • manifest.json   • main.js   • styles.css   • versions.json"
+echo "   （Obsidian 社区目录正是从这些 Release 附件读取插件文件，未上传则插件无法安装）"
+echo ""
+echo "   方式一（网页）：打开 https://github.com/${REPO}/releases/new?tag=${TAG} ，"
+echo "   标题填 v${VERSION}，把上面四个文件拖入附件区，点 Publish release。"
+echo "   方式二（若本机装有 gh，手动执行）："
+echo "   gh release create ${TAG} --title \"v${VERSION}\" --notes \"Weixin Sync v${VERSION}\" manifest.json main.js styles.css versions.json"
+echo ""
+echo "   随后到 Obsidian 社区目录提交/更新插件："
 echo "   1) 打开 ${SUBMIT_URL} 并用你的 Obsidian 账号登录"
 echo "   2) 在个人资料里绑定 GitHub 账号：chenyk0317"
 echo "   3) 开发者后台 → 你的插件下会出现新版本 ${VERSION}，点击 Review / 重新审核"

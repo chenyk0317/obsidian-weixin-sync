@@ -30,10 +30,12 @@ bash publish.sh 1.0.2      # 传入版本号：先改 manifest.json 的 version 
 3. **拷贝 main.js**：把构建产物 `weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js` 复制为仓库根目录的 `main.js`（发布需要它位于根目录）。
 4. **提交 Git**：确保本目录是独立 git 仓库（首次会自动 `git init` 并关联 `chenyk0317/obsidian-weixin-sync`），有改动才 `commit`。
 5. **推送 GitHub**：普通推送失败（本地落后）时自动 `git pull --rebase` 再推；若与远程历史分叉（首次从不同源发布）则退回 `--force-with-lease` 覆盖你自己的仓库。
-6. **打 Release**：`gh release create`，已存在的版本自动跳过（需覆盖可用 `gh release delete <版本>` 后重跑）。
+6. **打 Tag**：`git tag -a v<版本>` + `git push --tags`，已存在的 tag 自动跳过。
+   > 纯 git 无法创建 GitHub Release 及其下载附件。脚本只打并推送版本 tag；
+   > 带 `manifest.json` / `main.js` / `versions.json` 附件的 GitHub Release 需你到网页端手动创建（见脚本末尾指引，或本机用 `gh release create`）。
 7. **输出社区后台提交指引**，并尝试打开 https://community.obsidian.md 。
 
-> 说明：脚本不再克隆远程仓库到临时目录，而是直接在本目录（`weixin-sync-plugin`，它自身就是独立 git 仓库）完成提交、推送与打 Release。
+> 说明：脚本不再依赖 `gh`，也不克隆远程仓库到临时目录，而是直接在本目录（`weixin-sync-plugin`，它自身就是独立 git 仓库）完成构建、提交、推送与打 tag。
 
 ### 方式 B：手动分步
 
@@ -49,9 +51,11 @@ git init                                                       # 若尚未初始
 git remote add origin https://github.com/chenyk0317/obsidian-weixin-sync.git   # 若尚未关联
 git add -A && git commit -m "Release vX.Y.Z"
 git push -u origin master       # 首次若与远程历史分叉，用：git push -u origin master --force-with-lease
-gh release create X.Y.Z --title "vX.Y.Z" --notes "..." manifest.json main.js versions.json
+git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin --tags
 
-# 到 community.obsidian.md 后台提交/更新插件
+# 到 GitHub 网页为 tag vX.Y.Z 创建 Release，并上传 manifest.json / main.js / styles.css / versions.json 四个附件
+# （也可本机用：gh release create vX.Y.Z --title "vX.Y.Z" --notes "..." manifest.json main.js styles.css versions.json）
+# 随后到 community.obsidian.md 后台提交/更新插件
 ```
 
 ## 二、插件介绍文案（提交后台时参考）
