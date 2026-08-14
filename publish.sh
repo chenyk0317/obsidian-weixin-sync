@@ -127,12 +127,14 @@ push_branch() {
 push_branch "$CUR_BRANCH"
 
 # ---------- 7. 打 Tag + 创建带附件的 Release（已存在则跳过）----------
-TAG="v${VERSION}"
+# ⚠️ Obsidian 硬性规则：Release tag 必须与 manifest 的 version 完全一致（如 1.0.5），
+#    不能带 'v' 前缀（v1.0.5 会被社区目录判定为「无匹配 Release」）。
+TAG="${VERSION}"
 # 先确保 git tag 存在（纯 git 兜底；若 gh 失败也可仅凭 tag 重建 Release）
 if git rev-parse "${TAG}" >/dev/null 2>&1; then
   echo "ℹ️  Tag ${TAG} 已存在，跳过（如需覆盖请先删除本地与远程 tag 后重跑）"
 else
-  git tag -a "${TAG}" -m "Release v${VERSION}: Weixin Sync"
+  git tag -a "${TAG}" -m "Release ${VERSION}: Weixin Sync"
   git push origin --tags
   echo "✅ 已创建并推送 Tag ${TAG}"
 fi
@@ -140,7 +142,7 @@ fi
 if gh release view "${TAG}" >/dev/null 2>&1; then
   echo "ℹ️  Release ${TAG} 已存在，跳过（如需覆盖请先执行：gh release delete ${TAG}）"
 else
-  gh release create "${TAG}" --title "v${VERSION}" --notes "Weixin Sync v${VERSION}" \
+  gh release create "${TAG}" --title "v${VERSION}" --notes "Weixin Sync ${VERSION}" \
     manifest.json main.js styles.css versions.json \
     && echo "✅ 已创建 Release ${TAG}（含 4 个发布附件）"
 fi

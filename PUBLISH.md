@@ -30,7 +30,8 @@ bash publish.sh 1.0.2      # 传入版本号：先改 manifest.json 的 version 
 3. **拷贝 main.js**：把构建产物 `weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js` 复制为仓库根目录的 `main.js`（发布需要它位于根目录）。
 4. **提交 Git**：确保本目录是独立 git 仓库（首次会自动 `git init` 并关联 `chenyk0317/obsidian-weixin-sync`），有改动才 `commit`。
 5. **推送 GitHub**：普通推送失败（本地落后）时自动 `git pull --rebase` 再推；若与远程历史分叉（首次从不同源发布）则退回 `--force-with-lease` 覆盖你自己的仓库。
-6. **打 Tag + 创建 Release**：先 `git tag -a v<版本>` + `git push --tags`（已存在的 tag 跳过），再用 `gh release create` 创建带附件的 GitHub Release（已存在则跳过），附件为 `manifest.json` / `main.js` / `styles.css` / `versions.json` 四个文件。Obsidian 社区目录正是从这些 Release 附件读取插件文件。
+6. **打 Tag + 创建 Release**：先 `git tag -a <版本>` + `git push --tags`（已存在的 tag 跳过），再用 `gh release create` 创建带附件的 GitHub Release（已存在则跳过），附件为 `manifest.json` / `main.js` / `styles.css` / `versions.json` 四个文件。Obsidian 社区目录正是从这些 Release 附件读取插件文件。
+   > ⚠️ **tag 名必须与 manifest 的 version 完全一致、不带 `v` 前缀**（如 `1.0.5` 而非 `v1.0.5`）——这是 Obsidian 官方硬性规则，带 `v` 会报 `No release matches your manifest version`。
 7. **输出社区后台提交指引**，并尝试打开 https://community.obsidian.md 。
 
 > 说明：脚本依赖 `gh`（需 `gh auth login`），不再克隆远程仓库到临时目录，而是直接在本目录（`weixin-sync-plugin`，它自身就是独立 git 仓库）完成构建、提交、推送、打 tag 与创建带附件的 Release。
@@ -49,12 +50,13 @@ git init                                                       # 若尚未初始
 git remote add origin https://github.com/chenyk0317/obsidian-weixin-sync.git   # 若尚未关联
 git add -A && git commit -m "Release vX.Y.Z"
 git push -u origin master       # 首次若与远程历史分叉，用：git push -u origin master --force-with-lease
-git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin --tags
+# ⚠️ tag 名必须与 manifest 的 version 完全一致、不带 v 前缀（Obsidian 硬性规则）
+git tag -a X.Y.Z -m "Release X.Y.Z" && git push origin --tags
 
 # 创建带附件的 GitHub Release（社区目录读取这些附件）：
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "Weixin Sync vX.Y.Z" \
+gh release create X.Y.Z --title "vX.Y.Z" --notes "Weixin Sync X.Y.Z" \
   manifest.json main.js styles.css versions.json
-# （或到网页端手动创建：打开 https://github.com/chenyk0317/obsidian-weixin-sync/releases/new?tag=vX.Y.Z）
+# （或到网页端手动创建：打开 https://github.com/chenyk0317/obsidian-weixin-sync/releases/new?tag=X.Y.Z）
 # 随后到 community.obsidian.md 后台提交/更新插件
 ```
 
