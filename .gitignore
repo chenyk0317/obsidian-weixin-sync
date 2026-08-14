@@ -5,3 +5,7 @@ weixin-sync-test-vault/
 *.map
 .DS_Store
 .hotreload
+# 运行期用户数据（可能含 API Key 等敏感配置），不随发版发布
+data.json
+# 锁文件不入库，避免发版 diff 噪音
+package-lock.json

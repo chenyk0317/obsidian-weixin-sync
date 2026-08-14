@@ -1,21 +1,23 @@
 #!/usr/bin/env bash
 # Weixin Sync 全流程一键发布脚本
-# 本脚本位于插件开发目录 weixin-sync-plugin/，开发即发布源，无需额外的发布副本目录。
+# 本脚本位于插件开发目录 weixin-sync-plugin/——它既用于开发，也直接作为发布源，
+# 自身就是独立 git 仓库（remote 指向 GitHub 上的 chenyk0317/obsidian-weixin-sync）。
+# 无需再克隆到临时目录或维护额外的发布副本目录。
+#
 # 用法：
 #   bash publish.sh            # 版本号默认取 manifest.json
 #   bash publish.sh 1.0.2      # 传入版本号：先改 manifest.json 的 version，再走全流程
 #
-# 全流程：构建(npm install + build) → 克隆远程仓库到临时目录 → 拷贝发布文件 → git 提交 → 推送 GitHub → 打 Release
-# 兼容首次发布（自动建仓库）与后续迭代（跳过已存在的 Release）。
+# 全流程：构建(npm install + build) → 拷贝 main.js 到本目录 → git 提交 → 推送 GitHub → 打 Release
+# 兼容首次发布（自动处理与远程历史分叉）与后续迭代（跳过已存在的 Release）。
 # 远程仓库固定为 chenyk0317/obsidian-weixin-sync（GitHub 上的仓库名，与本地目录名不同是正常的）。
 #
-# 前置：本机已安装 gh 且 gh auth login 完成；已安装 Node.js(npm)。
+# 前置：本机已安装 gh 且 gh auth login 完成；已安装 Node.js(npm)、python3。
 set -uo pipefail
 
 # ---------- 路径 ----------
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"   # = weixin-sync-plugin
 REPO="chenyk0317/obsidian-weixin-sync"
-PUBLISH_TMP="${TMPDIR:-/tmp}/obsidian-weixin-sync-publish"
 
 # ---------- 0. 前置检查 ----------
 if ! command -v gh >/dev/null 2>&1; then
@@ -41,9 +43,11 @@ if [ -n "${1:-}" ]; then
     echo "❌ 版本号格式错误：应为 X.Y.Z（如 1.0.2）"
     exit 1
   fi
-  echo "📦 传入版本：${VERSION} —— 先更新 manifest.json 与 versions.json"
-  sed -i.bak -E "s/(\"version\"[[:space:]]*:[[:space:]]*\")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${VERSION}\2/" "$SCRIPT_DIR/manifest.json"
-  rm -f "$SCRIPT_DIR/manifest.json.bak"
+  echo "📦 传入版本：${VERSION} —— 先更新 manifest.json / package.json 与 versions.json"
+  for pf in "$SCRIPT_DIR/manifest.json" "$SCRIPT_DIR/package.json"; do
+    sed -i.bak -E "s/(\"version\"[[:space:]]*:[[:space:]]*\")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${VERSION}\2/" "$pf"
+    rm -f "$pf.bak"
+  done
   for vf in "$SCRIPT_DIR/versions.json"; do
     python3 - "$vf" "${VERSION}" <<'PY'
 import json, sys
@@ -72,32 +76,25 @@ echo "🔨 构建插件（npm install + npm run build）..."
 ( cd "$SCRIPT_DIR" && npm install >/dev/null 2>&1; npm run build ) || { echo "❌ 构建失败，已中止"; exit 1; }
 echo "✅ 构建完成"
 
-# ---------- 3. 克隆/准备远程仓库到临时目录 ----------
-echo "🔁 准备发布工作区（克隆 $REPO 到临时目录）..."
-rm -rf "$PUBLISH_TMP"
-if ! gh repo clone "$REPO" "$PUBLISH_TMP" 2>/dev/null; then
-  echo "⚠️  仓库 $REPO 不存在或克隆失败，尝试创建..."
-  gh repo create "$REPO" --public --clone "$PUBLISH_TMP" || { echo "❌ 无法创建仓库，请检查 gh 权限"; exit 1; }
+# ---------- 3. 拷贝 main.js 到发布根目录 ----------
+# esbuild 默认把 main.js 输出到本地测试 vault 的插件目录；发布需要它在仓库根目录。
+MAIN_JS_SRC="$SCRIPT_DIR/weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js"
+[ -f "$MAIN_JS_SRC" ] || { echo "❌ 未找到构建产物 main.js：$MAIN_JS_SRC（请确认 npm run build 已生成）"; exit 1; }
+cp "$MAIN_JS_SRC" "$SCRIPT_DIR/main.js"
+echo "✅ 已更新根目录 main.js（版本：$(read_version "$SCRIPT_DIR/manifest.json")）"
+
+# ---------- 4. 确保本目录是独立 git 仓库并关联远程 ----------
+if [ ! -d "$SCRIPT_DIR/.git" ]; then
+  echo "🔧 初始化本地 git 仓库..."
+  git init -q "$SCRIPT_DIR"
 fi
-cd "$PUBLISH_TMP" || exit 1
+if ! git -C "$SCRIPT_DIR" remote get-url origin >/dev/null 2>&1; then
+  git -C "$SCRIPT_DIR" remote add origin "https://github.com/${REPO}.git"
+  echo "🔗 已关联远程：${REPO}"
+fi
 
-# 清理旧发布文件（保留 .git / .gitignore），避免残留
-find "$PUBLISH_TMP" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.gitignore' -exec rm -rf {} +
-
-# ---------- 4. 拷贝发布文件 ----------
-echo "📋 拷贝发布文件..."
-MAIN_JS="$SCRIPT_DIR/weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js"
-[ -f "$MAIN_JS" ] || { echo "❌ 未找到构建产物 main.js：$MAIN_JS（请确认 npm run build 已生成）"; exit 1; }
-cp "$SCRIPT_DIR/manifest.json"        "$PUBLISH_TMP/manifest.json"
-cp "$MAIN_JS"                         "$PUBLISH_TMP/main.js"
-cp "$SCRIPT_DIR/versions.json"        "$PUBLISH_TMP/versions.json"
-cp -r "$SCRIPT_DIR/src"               "$PUBLISH_TMP/src"
-for f in LICENSE README.md package.json package-lock.json esbuild.config.mjs tsconfig.json; do
-  [ -e "$SCRIPT_DIR/$f" ] && cp "$SCRIPT_DIR/$f" "$PUBLISH_TMP/$f"
-done
-echo "✅ 拷贝完成（manifest 版本：$(read_version "$PUBLISH_TMP/manifest.json")）"
-
-# ---------- 5. Git 提交 ----------
+# ---------- 5. Git 提交（在发布目录内）----------
+cd "$SCRIPT_DIR" || exit 1
 git add -A
 if git diff --cached --quiet; then
   echo "ℹ️  无待提交变更"
@@ -106,19 +103,26 @@ else
   echo "✅ 已提交 v${VERSION}"
 fi
 
-# ---------- 6. 推送（失败自动 rebase 重试） ----------
+# ---------- 6. 推送（兼容首次/历史分叉，失败自动重试）----------
 CUR_BRANCH="$(git branch --show-current 2>/dev/null || echo master)"
 push_branch() {
-  if git push -u origin "$1"; then return 0; fi
+  local b="$1"
+  if git push -u origin "$b" 2>/dev/null; then
+    echo "✅ 已推送 $b"; return 0
+  fi
   echo "⚠️  普通推送被拒（本地落后于远程），尝试 git pull --rebase 后重试..."
-  if git pull --rebase origin "$1" && git push -u origin "$1"; then
+  if git pull --rebase origin "$b" 2>/dev/null && git push -u origin "$b" 2>/dev/null; then
     echo "✅ 已 rebase 并重推成功"; return 0
   fi
-  echo "⚠️  push 仍失败，请手动处理"; return 1
+  echo "⚠️  本地与远程历史分叉（可能首次从不同源发布），改用 --force-with-lease 覆盖你自己的仓库..."
+  if git push -u origin "$b" --force-with-lease 2>/dev/null; then
+    echo "✅ 已强制更新 $b（仅影响你自己的 fork/仓库，不影响他人）"; return 0
+  fi
+  echo "❌ push 仍失败，请手动处理"; return 1
 }
 push_branch "$CUR_BRANCH"
 
-# ---------- 7. 打 Release（已存在则跳过） ----------
+# ---------- 7. 打 Release（已存在则跳过）----------
 if gh release view "${VERSION}" >/dev/null 2>&1; then
   echo "ℹ️  Release ${VERSION} 已存在，跳过（如需覆盖请先执行：gh release delete ${VERSION}）"
 else
@@ -126,10 +130,7 @@ else
     && echo "✅ 已创建 Release ${VERSION}"
 fi
 
-# ---------- 8. 清理临时目录 ----------
-rm -rf "$PUBLISH_TMP"
-
-# ---------- 9. 社区后台提交指引 ----------
+# ---------- 8. 社区后台提交指引 ----------
 SUBMIT_URL="https://community.obsidian.md"
 echo ""
 echo "🚀 GitHub 仓库与 Release 已就绪。现在请到 Obsidian 社区目录提交/更新插件："

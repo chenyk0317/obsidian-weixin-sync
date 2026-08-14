@@ -27,13 +27,13 @@ bash publish.sh 1.0.2      # 传入版本号：先改 manifest.json 的 version 
 脚本全自动完成以下全流程（兼容首次发布与后续迭代）：
 1. **确定版本**：未传参则读 `manifest.json`；传入则先 `sed` 改 `manifest.json` 的 `version`，并给 `versions.json` 追加新版本条目。
 2. **生产构建**：在本目录执行 `npm install` + `npm run build`（生成 `weixin-sync-test-vault/.../main.js`）。
-3. **克隆远程仓库**到临时目录（仓库很小，重克隆很快），并清理旧发布文件。
-4. **拷贝发布文件**：`manifest.json` / `main.js` / `versions.json` / `src/` / `LICENSE` / `README.md` / `package.json` 等覆盖进临时目录。
-5. **提交 Git**：有改动才 `commit`。
-6. **推送 GitHub**：普通推送失败（本地落后）时自动 `git pull --rebase` 再推。
-7. **打 Release**：`gh release create`，已存在的版本自动跳过（需覆盖可用 `gh release delete <版本>` 后重跑）。
-8. **输出社区后台提交指引**，并尝试打开 https://community.obsidian.md 。
-9. 清理临时目录。
+3. **拷贝 main.js**：把构建产物 `weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js` 复制为仓库根目录的 `main.js`（发布需要它位于根目录）。
+4. **提交 Git**：确保本目录是独立 git 仓库（首次会自动 `git init` 并关联 `chenyk0317/obsidian-weixin-sync`），有改动才 `commit`。
+5. **推送 GitHub**：普通推送失败（本地落后）时自动 `git pull --rebase` 再推；若与远程历史分叉（首次从不同源发布）则退回 `--force-with-lease` 覆盖你自己的仓库。
+6. **打 Release**：`gh release create`，已存在的版本自动跳过（需覆盖可用 `gh release delete <版本>` 后重跑）。
+7. **输出社区后台提交指引**，并尝试打开 https://community.obsidian.md 。
+
+> 说明：脚本不再克隆远程仓库到临时目录，而是直接在本目录（`weixin-sync-plugin`，它自身就是独立 git 仓库）完成提交、推送与打 Release。
 
 ### 方式 B：手动分步
 
@@ -41,19 +41,14 @@ bash publish.sh 1.0.2      # 传入版本号：先改 manifest.json 的 version 
 cd code/weixin-sync-plugin
 npm install && npm run build
 
-# 准备一个干净的发布工作区（克隆你的 GitHub 仓库）
-rm -rf /tmp/obsidian-weixin-sync-publish
-gh repo clone chenyk0317/obsidian-weixin-sync /tmp/obsidian-weixin-sync-publish
-cd /tmp/obsidian-weixin-sync-publish
-# 删掉除 .git/.gitignore 外的旧文件，再把本目录发布文件拷入
-find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.gitignore' -exec rm -rf {} +
-cp ../weixin-sync-plugin/manifest.json .
-cp ../weixin-sync-plugin/weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js .
-cp ../weixin-sync-plugin/versions.json .
-cp -r ../weixin-sync-plugin/src .
-cp ../weixin-sync-plugin/LICENSE ../weixin-sync-plugin/README.md ../weixin-sync-plugin/package.json ../weixin-sync-plugin/esbuild.config.mjs ../weixin-sync-plugin/tsconfig.json .
+# 构建产物 main.js 在本地测试 vault 内，复制到仓库根目录用于发布
+cp weixin-sync-test-vault/.obsidian/plugins/weixin-sync/main.js ./main.js
 
-git add -A && git commit -m "Release vX.Y.Z" && git push origin master
+# 本目录即独立 git 仓库（首次需 git init 并关联远程）
+git init                                                       # 若尚未初始化
+git remote add origin https://github.com/chenyk0317/obsidian-weixin-sync.git   # 若尚未关联
+git add -A && git commit -m "Release vX.Y.Z"
+git push -u origin master       # 首次若与远程历史分叉，用：git push -u origin master --force-with-lease
 gh release create X.Y.Z --title "vX.Y.Z" --notes "..." manifest.json main.js versions.json
 
 # 到 community.obsidian.md 后台提交/更新插件
