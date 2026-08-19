@@ -7,4 +7,8 @@ export interface ContentParser {
   // 对应的 content_kind 取值（与后端枚举、小程序保持一致）
   kind: string;
   parse(html: string): ParsedArticle;
+  // 可选：直接按 URL 拉取并解析正文（适用于站点对纯 HTML 抓取有反爬、
+  // 但提供公开只读 API 的平台，如知乎 answers API）。
+  // 返回 null 表示该 URL 形态不支持或拉取失败，由调用方回退到 parse(html)。
+  parseFromUrl?(url: string): Promise<ParsedArticle | null>;
 }

@@ -21,7 +21,7 @@ const registry: Record<string, ContentParser> = {
 function detectByUrl(url: string): ContentParser {
   const u = (url || "").toLowerCase();
   if (u.includes("mp.weixin.qq.com") || u.includes("weixin.qq.com")) return registry["微信公众号"];
-  if (u.includes("xiaohongshu.com") || u.includes("xhslink.com")) return registry["小红书"];
+  if (u.includes("xiaohongshu.com") || u.includes("xhslink.com") || u.includes("xhslink.cn")) return registry["小红书"];
   if (u.includes("zhihu.com")) return registry["知乎"];
   if (u.includes("juejin.cn")) return registry["稀土掘金"];
   if (u.includes("toutiao.com")) return registry["今日头条"];

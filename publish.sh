@@ -103,8 +103,8 @@ git add -A
 if git diff --cached --quiet; then
   echo "ℹ️  无待提交变更"
 else
-  git commit -q -m "Release v${VERSION}: Weixin Sync"
-  echo "✅ 已提交 v${VERSION}"
+  git commit -q -m "Release ${VERSION}: Weixin Sync"
+  echo "✅ 已提交 ${VERSION}"
 fi
 
 # ---------- 6. 推送（兼容首次/历史分叉，失败自动重试）----------

@@ -18,6 +18,11 @@ export class JuejinParser implements ContentParser {
       doc.querySelector("article") ||
       doc.body;
     const { content, images } = elementToMarkdown(root as HTMLElement);
-    return { title, content, images };
+    // 掘金 markdown 渲染会把行内图片与相邻文本粘连（<p><img>text</p> 或 <p>text<img></p>
+    // → ![..](..)text / text![..](..)），在图片与文本之间补换行，保证 Obsidian 渲染时图片独立成行。
+    const fixed = content
+      .replace(/(!\[[^\]]*\]\([^)]*\))(?=\S)/g, "$1\n\n") // 图片后紧跟文本
+      .replace(/(\S)(!\[[^\]]*\]\([^)]*\))/g, "$1\n\n$2"); // 文本后紧跟图片
+    return { title, content: fixed, images };
   }
 }

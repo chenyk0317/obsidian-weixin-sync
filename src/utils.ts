@@ -103,17 +103,22 @@ const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-export async function fetchHtml(url: string): Promise<string> {
+export async function fetchHtml(url: string, ua?: string): Promise<string> {
   const r = await requestUrl({
     url,
     headers: {
-      "User-Agent": BROWSER_UA,
+      "User-Agent": ua || BROWSER_UA,
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     },
   });
   return r.text;
 }
+
+// 移动端浏览器 UA：头条等站点对桌面 UA 返回 JS 反爬壳（_$jsvmprt），移动 UA 返回真实 H5 页面。
+export const MOBILE_BROWSER_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 " +
+  "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
 // 下载二进制（图片）。微信等站点的图片需带 Referer 否则返回 403，
 // 这里对微信域名自动补 Referer / UA，提升本地化成功率；同时返回 Content-Type 用于推断扩展名。

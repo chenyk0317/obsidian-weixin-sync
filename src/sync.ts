@@ -13,6 +13,7 @@ import {
   formatDate,
 } from "./utils";
 import { getParser } from "./parsers";
+import type { ContentParser } from "./parsers/types";
 // 执行一次同步：按每个 API Key（对应用户）拉取待同步列表 -> 本地解析写入 -> 回写结果。
 export async function syncOnce(plugin: WinxinSyncPlugin): Promise<ConfirmResult[]> {
   const keys = plugin.api.getApiKeys();
@@ -65,8 +66,6 @@ async function resolveFolder(plugin: WinxinSyncPlugin, fields: Record<string, st
 }
 
 async function writeArticle(plugin: WinxinSyncPlugin, a: Article) {
-  const html = await fetchHtml(a.source_url as string);
-
   const fields = {
     saved_date: formatDate(new Date()),
     title: a.title,
@@ -77,10 +76,19 @@ async function writeArticle(plugin: WinxinSyncPlugin, a: Article) {
   };
   const { dir, att } = await resolveFolder(plugin, fields);
 
-  // 按 content_kind（未知时按域名）选择对应平台解析器，提取正文与图片，
-  // 并就地把正文中的远程图片 URL 替换为本地附件路径（wikilink 嵌入，按仓库根解析）。
+  // 按 content_kind（未知时按域名）选择对应平台解析器，提取正文与图片。
+  // 优先尝试 parseFromUrl（知乎等对纯 HTML 抓取有反爬、但走官方 API 可读的平台）；
+  // 返回 null / 不支持时回退到 fetchHtml + parse(html)。
   const parser = getParser(a.content_kind, a.source_url || "");
-  const { content, images } = parser.parse(html);
+  let parsed: ReturnType<ContentParser["parse"]> | null = null;
+  if (typeof parser.parseFromUrl === "function") {
+    parsed = await parser.parseFromUrl(a.source_url as string);
+  }
+  if (!parsed) {
+    const html = await fetchHtml(a.source_url as string);
+    parsed = parser.parse(html);
+  }
+  const { content, images } = parsed;
   let body = content;
   if (plugin.settings.imageLocalization && images.length) {
     await ensureFolder(plugin.app, att);

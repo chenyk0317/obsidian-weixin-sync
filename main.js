@@ -462,17 +462,18 @@ function extFromBinary(url, contentType, buf) {
   return "png";
 }
 var BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-async function fetchHtml(url) {
+async function fetchHtml(url, ua) {
   const r = await (0, import_obsidian3.requestUrl)({
     url,
     headers: {
-      "User-Agent": BROWSER_UA,
+      "User-Agent": ua || BROWSER_UA,
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
     }
   });
   return r.text;
 }
+var MOBILE_BROWSER_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 async function downloadBinary(url) {
   const headers = {};
   if (/mp\.weixin\.qq\.com|qq\.com/i.test(url)) {
@@ -780,20 +781,121 @@ var XiaohongshuParser = class {
   constructor() {
     __publicField(this, "kind", "\u5C0F\u7EA2\u4E66");
   }
+  // 直接按 URL 拉取：fetchHtml 自动跟随短链 302，取到带 xsec_token 的笔记详情页。
+  async parseFromUrl(url) {
+    try {
+      const html = await fetchHtml(url);
+      return parseXiaohongshuHtml(html);
+    } catch (e) {
+      return null;
+    }
+  }
   parse(html) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const titleEl = doc.querySelector(".note-title") || doc.querySelector("#detail-title") || doc.querySelector("h1") || doc.querySelector("title");
-    const title = ((titleEl == null ? void 0 : titleEl.textContent) || doc.title || "\u5C0F\u7EA2\u4E66\u7B14\u8BB0").trim();
-    const root = doc.querySelector(".note-content") || doc.querySelector(".desc") || doc.querySelector("article") || doc.body;
-    const { content, images } = elementToMarkdown(root);
-    return { title, content, images };
+    return parseXiaohongshuHtml(html);
   }
 };
+function parseInitialState(html) {
+  const start = html.indexOf("window.__INITIAL_STATE__");
+  if (start === -1)
+    return null;
+  const eq = html.indexOf("=", start);
+  if (eq === -1)
+    return null;
+  const end = html.indexOf("<\/script>", eq);
+  if (end === -1)
+    return null;
+  let s = html.slice(eq + 1, end).trim();
+  if (s.endsWith(";"))
+    s = s.slice(0, -1);
+  s = s.replace(/:undefined(?=[,}])/g, ":null").replace(/:!0(?=[,}])/g, ":true").replace(/:!1(?=[,}])/g, ":false");
+  try {
+    return JSON.parse(s);
+  } catch (e) {
+    return null;
+  }
+}
+function normalizeImageUrl(u) {
+  if (!u)
+    return "";
+  if (u.startsWith("//"))
+    return "https:" + u;
+  if (u.startsWith("http://"))
+    return "https://" + u.slice(7);
+  return u;
+}
+function parseXiaohongshuHtml(html) {
+  const state = parseInitialState(html);
+  const noteMap = state && state.note && state.note.noteDetailMap || {};
+  const keys = Object.keys(noteMap);
+  const note = keys.length ? noteMap[keys[0]].note : null;
+  if (note) {
+    const title2 = (note.title || "").trim() || "\u5C0F\u7EA2\u4E66\u7B14\u8BB0";
+    const desc = (note.desc || "").replace(/\[话题\]/g, "").trim();
+    const images2 = (note.imageList || []).map((i) => normalizeImageUrl(i.urlDefault || i.url || "")).filter((u) => /^https?:/.test(u));
+    const imgMd = images2.map((u, i) => `![\u56FE\u7247${i + 1}](${u})`).join("\n\n");
+    const content2 = [desc, imgMd].filter(Boolean).join("\n\n");
+    return { title: title2, content: content2, images: images2 };
+  }
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const titleEl = doc.querySelector(".note-title") || doc.querySelector("#detail-title") || doc.querySelector("h1") || doc.querySelector("title");
+  const title = ((titleEl == null ? void 0 : titleEl.textContent) || doc.title || "\u5C0F\u7EA2\u4E66\u7B14\u8BB0").replace(/\s*-\s*小红书\s*$/, "").trim();
+  const root = doc.querySelector(".note-content") || doc.querySelector(".desc") || doc.querySelector("article") || doc.body;
+  const { content, images } = elementToMarkdown(root);
+  return { title, content, images };
+}
 
 // src/parsers/zhihu.ts
-var ZhihuParser = class {
+var ZhihuParser = class _ZhihuParser {
   constructor() {
     __publicField(this, "kind", "\u77E5\u4E4E");
+  }
+  // 从 URL 中提取知乎回答 ID，支持两种形态：
+  //   https://www.zhihu.com/question/{qid}/answer/{aid}         （path）
+  //   https://www.zhihu.com/question/{qid}?answer_id={aid}      （query）
+  static extractAnswerId(url) {
+    const u = url || "";
+    const m = u.match(/\/answer\/(\d+)/) || u.match(/[?&]answer_id=(\d+)/);
+    return m ? m[1] : null;
+  }
+  async parseFromUrl(url) {
+    const aid = _ZhihuParser.extractAnswerId(url);
+    if (!aid)
+      return null;
+    try {
+      const json = await fetchHtml(
+        `https://www.zhihu.com/api/v4/answers/${aid}?include=content,excerpt,author,question,voteup_count,comment_count`
+      );
+      const data = JSON.parse(json);
+      const rawHtml = data && data.content;
+      if (!rawHtml)
+        return null;
+      const truncated = !!(data && data.content_need_truncated);
+      const html = rawHtml.replace(
+        /https:\/\/link\.zhihu\.com\/\?target=([^"'<>\s]+)/g,
+        (_m, t) => decodeURIComponent(t)
+      );
+      const doc = new DOMParser().parseFromString(
+        `<div id="zhihu-content">${html}</div>`,
+        "text/html"
+      );
+      const root = doc.getElementById("zhihu-content");
+      const { content, images } = elementToMarkdown(root);
+      const title = data.question && data.question.title || "\u77E5\u4E4E";
+      if (!truncated)
+        return { title, content, images };
+      return {
+        title,
+        content: `${content}
+
+---
+
+> \u26A0\uFE0F \u8BE5\u56DE\u7B54\u8F83\u957F\uFF0C\u77E5\u4E4E\u5BF9\u672A\u767B\u5F55\u8BBF\u95EE\u4EC5\u63D0\u4F9B\u5F00\u5934\u7247\u6BB5\uFF08\u672C\u6587\u4E3A\u90E8\u5206\u5185\u5BB9\uFF09\u3002\u5B8C\u6574\u56DE\u7B54\u8BF7\u6253\u5F00\u539F\u6587\u67E5\u770B\uFF1A${url}
+`,
+        images
+      };
+    } catch (e) {
+      return null;
+    }
   }
   parse(html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -816,7 +918,8 @@ var JuejinParser = class {
     const title = ((titleEl == null ? void 0 : titleEl.textContent) || doc.title || "\u7A00\u571F\u6398\u91D1\u6587\u7AE0").trim();
     const root = doc.querySelector(".markdown-body") || doc.querySelector(".article-content") || doc.querySelector("article") || doc.body;
     const { content, images } = elementToMarkdown(root);
-    return { title, content, images };
+    const fixed = content.replace(/(!\[[^\]]*\]\([^)]*\))(?=\S)/g, "$1\n\n").replace(/(\S)(!\[[^\]]*\]\([^)]*\))/g, "$1\n\n$2");
+    return { title, content: fixed, images };
   }
 };
 
@@ -825,15 +928,49 @@ var ToutiaoParser = class {
   constructor() {
     __publicField(this, "kind", "\u4ECA\u65E5\u5934\u6761");
   }
+  // 直接用移动 UA 拉取（自动跟随短链跳转 → m 域 H5 页），解析 RENDER_DATA。
+  async parseFromUrl(url) {
+    try {
+      const html = await fetchHtml(url, MOBILE_BROWSER_UA);
+      return parseToutiaoHtml(html);
+    } catch (e) {
+      return null;
+    }
+  }
   parse(html) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const titleEl = doc.querySelector(".article-title") || doc.querySelector("h1") || doc.querySelector("title");
-    const title = ((titleEl == null ? void 0 : titleEl.textContent) || doc.title || "\u4ECA\u65E5\u5934\u6761\u6587\u7AE0").trim();
-    const root = doc.querySelector(".article-content") || doc.querySelector(".tt-article-content") || doc.querySelector("article") || doc.body;
-    const { content, images } = elementToMarkdown(root);
-    return { title, content, images };
+    return parseToutiaoHtml(html);
   }
 };
+function parseRenderData(html) {
+  const m = html.match(/id="RENDER_DATA"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m)
+    return null;
+  try {
+    return JSON.parse(decodeURIComponent(m[1].trim()));
+  } catch (e) {
+    return null;
+  }
+}
+function parseToutiaoHtml(html) {
+  const state = parseRenderData(html);
+  const info = state && state.articleInfo;
+  if (info && info.content) {
+    const title2 = (info.title || "").trim() || "\u4ECA\u65E5\u5934\u6761\u6587\u7AE0";
+    const doc2 = new DOMParser().parseFromString(
+      `<div id="tt-content">${info.content}</div>`,
+      "text/html"
+    );
+    const root2 = doc2.getElementById("tt-content");
+    const { content: content2, images: images2 } = elementToMarkdown(root2);
+    return { title: title2, content: content2, images: images2 };
+  }
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const titleEl = doc.querySelector(".article-title") || doc.querySelector("h1") || doc.querySelector("title");
+  const title = ((titleEl == null ? void 0 : titleEl.textContent) || doc.title || "\u4ECA\u65E5\u5934\u6761\u6587\u7AE0").replace(/\s*-\s*今日头条\s*$/, "").trim();
+  const root = doc.querySelector(".article-content") || doc.querySelector(".tt-article-content") || doc.querySelector("article") || doc.body;
+  const { content, images } = elementToMarkdown(root);
+  return { title, content, images };
+}
 
 // src/parsers/generic.ts
 var GenericParser = class {
@@ -863,7 +1000,7 @@ function detectByUrl(url) {
   const u = (url || "").toLowerCase();
   if (u.includes("mp.weixin.qq.com") || u.includes("weixin.qq.com"))
     return registry["\u5FAE\u4FE1\u516C\u4F17\u53F7"];
-  if (u.includes("xiaohongshu.com") || u.includes("xhslink.com"))
+  if (u.includes("xiaohongshu.com") || u.includes("xhslink.com") || u.includes("xhslink.cn"))
     return registry["\u5C0F\u7EA2\u4E66"];
   if (u.includes("zhihu.com"))
     return registry["\u77E5\u4E4E"];
@@ -926,7 +1063,6 @@ async function resolveFolder(plugin, fields) {
   return { dir, att };
 }
 async function writeArticle(plugin, a) {
-  const html = await fetchHtml(a.source_url);
   const fields = {
     saved_date: formatDate(/* @__PURE__ */ new Date()),
     title: a.title,
@@ -937,7 +1073,15 @@ async function writeArticle(plugin, a) {
   };
   const { dir, att } = await resolveFolder(plugin, fields);
   const parser = getParser(a.content_kind, a.source_url || "");
-  const { content, images } = parser.parse(html);
+  let parsed = null;
+  if (typeof parser.parseFromUrl === "function") {
+    parsed = await parser.parseFromUrl(a.source_url);
+  }
+  if (!parsed) {
+    const html = await fetchHtml(a.source_url);
+    parsed = parser.parse(html);
+  }
+  const { content, images } = parsed;
   let body = content;
   if (plugin.settings.imageLocalization && images.length) {
     await ensureFolder(plugin.app, att);
