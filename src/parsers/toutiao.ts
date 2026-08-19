@@ -14,7 +14,13 @@ export class ToutiaoParser implements ContentParser {
   // 直接用移动 UA 拉取（自动跟随短链跳转 → m 域 H5 页），解析 RENDER_DATA。
   async parseFromUrl(url: string): Promise<ParsedArticle | null> {
     try {
-      const html = await fetchHtml(url, MOBILE_BROWSER_UA);
+      // www.toutiao.com / toutiao.com 对任何 UA 都只返回 _$jsvmprt 反爬壳，
+      // 必须改写为 m.toutiao.com（同一路径）才返回真实 H5 页；已是 m 域（含短链）则原样。
+      const reqUrl = url.replace(
+        /^https?:\/\/(www\.)?toutiao\.com\//i,
+        "https://m.toutiao.com/"
+      );
+      const html = await fetchHtml(reqUrl, MOBILE_BROWSER_UA);
       return parseToutiaoHtml(html);
     } catch (e) {
       // 网络异常等不阻断：由调用方回退 HTML 解析

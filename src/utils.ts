@@ -17,7 +17,7 @@ export async function ensureFolder(app: App, path: string): Promise<void> {
   }
 }
 
-// 按模板生成文件名，支持 {{saved_date}}/{{title}}/{{source}}/{{sync_id}}/{{author}}/{{url}}
+// 按模板生成文件名，支持 {{saved_date}}/{{title}}/{{content_kind}}/{{source}}/{{sync_id}}
 export function fileNameFromTemplate(template: string, fields: Record<string, string>): string {
   return sanitizeFileName(
     template.replace(/\{\{(\w+)\}\}/g, (_, k) => fields[k] || "")

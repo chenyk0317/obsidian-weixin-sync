@@ -331,7 +331,7 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
       })
     );
     new import_obsidian2.Setting(containerEl).setName("\u6587\u7AE0\u540C\u6B65\u76EE\u5F55").setDesc(
-      "\u6587\u7AE0\u5199\u5165\u76EE\u5F55\u3002\u9ED8\u8BA4\u300CWX\u540C\u6B65/{{source}}\u300D\uFF0C\u5373\u6309\u6765\u6E90\u516C\u4F17\u53F7\u5206\u76EE\u5F55\u3002\u652F\u6301\u53D8\u91CF\uFF1A{{saved_date}} {{title}} {{source}} {{author}} {{sync_id}} {{url}}\uFF08\u7528 / \u5206\u9694\u5C42\u7EA7\uFF09"
+      "\u6587\u7AE0\u5199\u5165\u76EE\u5F55\u3002\u9ED8\u8BA4\u300CWX\u540C\u6B65/{{source}}\u300D\uFF0C\u5373\u6309\u6765\u6E90\u516C\u4F17\u53F7\u5206\u76EE\u5F55\u3002\u652F\u6301\u53D8\u91CF\uFF1A{{title}} {{source}} {{content_kind}} {{saved_date}} {{sync_id}}\uFF08\u7528 / \u5206\u9694\u5C42\u7EA7\uFF09"
     ).addText(
       (t) => t.setValue(this.plugin.settings.syncDir).onChange(async (v) => {
         this.plugin.settings.syncDir = v;
@@ -339,7 +339,7 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
       })
     );
     new import_obsidian2.Setting(containerEl).setName("\u6587\u4EF6\u540D\u683C\u5F0F").setDesc(
-      "\u7B14\u8BB0\u6587\u4EF6\u540D\u6A21\u677F\u3002\u9ED8\u8BA4\u300C{{saved_date}}-{{title}}\u300D\u3002\u53EF\u7528\u53D8\u91CF\uFF1A{{saved_date}} {{title}} {{source}} {{sync_id}} {{author}} {{url}}"
+      "\u7B14\u8BB0\u6587\u4EF6\u540D\u6A21\u677F\u3002\u9ED8\u8BA4\u300C{{saved_date}}-{{title}}\u300D\u3002\u53EF\u7528\u53D8\u91CF\uFF1A{{title}} {{source}} {{content_kind}} {{saved_date}} {{sync_id}}"
     ).addText(
       (t) => t.setValue(this.plugin.settings.fileNameFormat).onChange(async (v) => {
         this.plugin.settings.fileNameFormat = v;
@@ -353,7 +353,7 @@ var WinxinSyncSettingTab = class extends import_obsidian2.PluginSettingTab {
       })
     );
     new import_obsidian2.Setting(containerEl).setName("\u56FE\u7247\u5B58\u50A8\u8DEF\u5F84").setDesc(
-      "\u56FE\u7247\u9644\u4EF6\u6240\u5728\u76EE\u5F55\uFF08\u7B14\u8BB0\u5185\u4EE5 wikilink \u5F15\u7528\uFF09\u3002\u9ED8\u8BA4\u300CWX\u540C\u6B65/{{source}}/\u9644\u4EF6\u8D44\u6E90/{{title}}\u300D\uFF0C\u5373\u6309\u6765\u6E90\u8D26\u53F7 + \u6807\u9898\u5206\u6876\u3002\u652F\u6301\u53D8\u91CF\uFF1A{{saved_date}} {{title}} {{source}} {{author}} {{sync_id}} {{url}}\uFF08\u7528 / \u5206\u9694\u5C42\u7EA7\uFF09"
+      "\u56FE\u7247\u9644\u4EF6\u6240\u5728\u76EE\u5F55\uFF08\u7B14\u8BB0\u5185\u4EE5 wikilink \u5F15\u7528\uFF09\u3002\u9ED8\u8BA4\u300CWX\u540C\u6B65/{{source}}/\u9644\u4EF6\u8D44\u6E90/{{title}}\u300D\uFF0C\u5373\u6309\u6765\u6E90\u8D26\u53F7 + \u6807\u9898\u5206\u6876\u3002\u652F\u6301\u53D8\u91CF\uFF1A{{title}} {{source}} {{content_kind}} {{saved_date}} {{sync_id}}\uFF08\u7528 / \u5206\u9694\u5C42\u7EA7\uFF09"
     ).addText(
       (t) => t.setValue(this.plugin.settings.imageDir).onChange(async (v) => {
         this.plugin.settings.imageDir = v;
@@ -931,7 +931,11 @@ var ToutiaoParser = class {
   // 直接用移动 UA 拉取（自动跟随短链跳转 → m 域 H5 页），解析 RENDER_DATA。
   async parseFromUrl(url) {
     try {
-      const html = await fetchHtml(url, MOBILE_BROWSER_UA);
+      const reqUrl = url.replace(
+        /^https?:\/\/(www\.)?toutiao\.com\//i,
+        "https://m.toutiao.com/"
+      );
+      const html = await fetchHtml(reqUrl, MOBILE_BROWSER_UA);
       return parseToutiaoHtml(html);
     } catch (e) {
       return null;
@@ -1066,9 +1070,8 @@ async function writeArticle(plugin, a) {
   const fields = {
     saved_date: formatDate(/* @__PURE__ */ new Date()),
     title: a.title,
+    content_kind: a.content_kind || "",
     source: a.source || "",
-    author: a.author || "",
-    url: a.source_url || "",
     sync_id: a.sync_id
   };
   const { dir, att } = await resolveFolder(plugin, fields);
@@ -1118,9 +1121,8 @@ async function writeMemo(plugin, a) {
   const fields = {
     saved_date: formatDate(/* @__PURE__ */ new Date()),
     title: a.title,
+    content_kind: a.content_kind || "",
     source: "",
-    author: "",
-    url: "",
     sync_id: a.sync_id
   };
   const dir = dirFromTemplate(plugin.settings.syncDir, fields);

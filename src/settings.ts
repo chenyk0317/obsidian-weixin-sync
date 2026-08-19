@@ -242,7 +242,7 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("文章同步目录")
       .setDesc(
-        "文章写入目录。默认「WX同步/{{source}}」，即按来源公众号分目录。支持变量：{{saved_date}} {{title}} {{source}} {{author}} {{sync_id}} {{url}}（用 / 分隔层级）"
+        "文章写入目录。默认「WX同步/{{source}}」，即按来源公众号分目录。支持变量：{{title}} {{source}} {{content_kind}} {{saved_date}} {{sync_id}}（用 / 分隔层级）"
       )
       .addText((t) =>
         t.setValue(this.plugin.settings.syncDir).onChange(async (v) => {
@@ -253,7 +253,7 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("文件名格式")
       .setDesc(
-        "笔记文件名模板。默认「{{saved_date}}-{{title}}」。可用变量：{{saved_date}} {{title}} {{source}} {{sync_id}} {{author}} {{url}}"
+        "笔记文件名模板。默认「{{saved_date}}-{{title}}」。可用变量：{{title}} {{source}} {{content_kind}} {{saved_date}} {{sync_id}}"
       )
       .addText((t) =>
         t.setValue(this.plugin.settings.fileNameFormat).onChange(async (v) => {
@@ -272,7 +272,7 @@ export class WinxinSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("图片存储路径")
       .setDesc(
-        "图片附件所在目录（笔记内以 wikilink 引用）。默认「WX同步/{{source}}/附件资源/{{title}}」，即按来源账号 + 标题分桶。支持变量：{{saved_date}} {{title}} {{source}} {{author}} {{sync_id}} {{url}}（用 / 分隔层级）"
+        "图片附件所在目录（笔记内以 wikilink 引用）。默认「WX同步/{{source}}/附件资源/{{title}}」，即按来源账号 + 标题分桶。支持变量：{{title}} {{source}} {{content_kind}} {{saved_date}} {{sync_id}}（用 / 分隔层级）"
       )
       .addText((t) =>
         t.setValue(this.plugin.settings.imageDir).onChange(async (v) => {

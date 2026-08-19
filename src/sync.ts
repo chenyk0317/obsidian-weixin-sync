@@ -69,9 +69,8 @@ async function writeArticle(plugin: WinxinSyncPlugin, a: Article) {
   const fields = {
     saved_date: formatDate(new Date()),
     title: a.title,
+    content_kind: a.content_kind || "",
     source: a.source || "",
-    author: a.author || "",
-    url: a.source_url || "",
     sync_id: a.sync_id,
   };
   const { dir, att } = await resolveFolder(plugin, fields);
@@ -129,9 +128,8 @@ async function writeMemo(plugin: WinxinSyncPlugin, a: Article) {
   const fields = {
     saved_date: formatDate(new Date()),
     title: a.title,
+    content_kind: a.content_kind || "",
     source: "",
-    author: "",
-    url: "",
     sync_id: a.sync_id,
   };
   const dir = dirFromTemplate(plugin.settings.syncDir, fields);
